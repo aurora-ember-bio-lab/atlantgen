@@ -1,0 +1,18 @@
+name: Aura Amber Migration
+url: https://aura-amber-saas.vercel.app
+hook_attributes:
+  url: https://aura-amber-saas.vercel.app/github/webhooks
+redirect_url: https://aura-amber-saas.vercel.app/auth/callback
+public: false
+
+default_permissions:
+  contents: write
+  metadata: read
+  administration: write
+  actions: write
+  deployments: write
+
+default_events:
+  - marketplace_purchase
+  - installation
+  - installation_repositories
