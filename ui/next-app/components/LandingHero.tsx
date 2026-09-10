@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import GlassTabs from "./GlassTabs";
 
 const connectors = [
   { id: "wordpress", name: "WordPress", icon: "W", color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
@@ -458,6 +459,9 @@ table "orders" {
           </div>
         </div>
       </section>
+
+      {/* ── Glass Tabs (Plans, Legal, License) ─────────────────── */}
+      <GlassTabs />
 
       {/* ── CTA ─────────────────────────────────────────────────── */}
       <section id="get-started" className="border-t border-neutral-800/60 py-24">
