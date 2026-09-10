@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
+
 const tabs = [
   { id: "plans", label: "Plans" },
   { id: "privacy", label: "Privacy" },
@@ -14,6 +16,7 @@ const tabs = [
 const plans = [
   {
     name: "Starter",
+    slug: "starter",
     price: "$29",
     period: "/mo",
     features: ["3 migrations/mo", "10k records/migration", "WordPress + WooCommerce", "Community support"],
@@ -22,6 +25,7 @@ const plans = [
   },
   {
     name: "Growth",
+    slug: "growth",
     price: "$99",
     period: "/mo",
     features: ["25 migrations/mo", "250k records/migration", "+ Shopify", "Email support (48h)", "Priority queue"],
@@ -30,6 +34,7 @@ const plans = [
   },
   {
     name: "Scale",
+    slug: "scale",
     price: "$299",
     period: "/mo",
     features: ["Unlimited migrations", "2M records/migration", "+ Magento + API", "Priority support (24h)", "Custom connectors", "Dedicated instance"],
@@ -40,6 +45,40 @@ const plans = [
 
 export default function GlassTabs() {
   const [activeTab, setActiveTab] = useState("plans");
+  const [checkoutModal, setCheckoutModal] = useState<{ plan: string; slug: string } | null>(null);
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleCheckout(planSlug: string) {
+    if (!email) {
+      setError("Email is required");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(`${API_URL}/api/billing/checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          login: email.split("@")[0],
+          plan: planSlug,
+          email,
+        }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else if (data.error) {
+        setError(data.error);
+      }
+    } catch {
+      setError("Failed to connect to billing API");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <section className="py-24">
@@ -66,7 +105,6 @@ export default function GlassTabs() {
 
         {/* Tab content — glass panel */}
         <div className="relative overflow-hidden rounded-2xl border border-neutral-800/60 bg-neutral-900/40 backdrop-blur-xl shadow-2xl shadow-black/20">
-          {/* subtle gradient overlay */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-amber-500/5 via-transparent to-orange-500/5" />
 
           <div className="relative p-8 md:p-10">
@@ -105,6 +143,13 @@ export default function GlassTabs() {
                         ))}
                       </ul>
                       <button
+                        onClick={() => {
+                          if (plan.slug === "scale") {
+                            window.location.href = "mailto:aurora.ember.lab@gmail.com?subject=Scale%20Plan%20Inquiry";
+                          } else {
+                            setCheckoutModal({ plan: plan.name, slug: plan.slug });
+                          }
+                        }}
                         className={`mt-8 w-full rounded-lg py-2.5 text-sm font-semibold transition-all ${
                           plan.highlighted
                             ? "bg-amber-500 text-neutral-950 hover:bg-amber-400"
@@ -201,6 +246,45 @@ export default function GlassTabs() {
           </div>
         </div>
       </div>
+
+      {/* Checkout Modal */}
+      {checkoutModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setCheckoutModal(null)}>
+          <div className="mx-4 w-full max-w-md rounded-2xl border border-neutral-800 bg-neutral-900 p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-xl font-bold">Subscribe to {checkoutModal.plan}</h3>
+            <p className="mt-2 text-sm text-neutral-400">You&apos;ll be redirected to Stripe Checkout.</p>
+
+            <div className="mt-6">
+              <label className="block text-sm font-medium text-neutral-300">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="mt-1 w-full rounded-lg border border-neutral-700 bg-neutral-950 px-4 py-2.5 text-sm text-neutral-100 placeholder-neutral-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+              />
+            </div>
+
+            {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setCheckoutModal(null)}
+                className="flex-1 rounded-lg border border-neutral-700 py-2.5 text-sm font-medium text-neutral-300 hover:border-neutral-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleCheckout(checkoutModal.slug)}
+                disabled={loading}
+                className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-neutral-950 hover:bg-amber-400 disabled:opacity-50"
+              >
+                {loading ? "Redirecting..." : "Continue to Checkout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
