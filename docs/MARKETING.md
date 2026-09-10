@@ -22,7 +22,7 @@ Target: Next.js + MedusaJS + PostgreSQL.
 
 - Hero: "Migrate your store to Next.js + MedusaJS without losing orders, customers, or SEO."
 - CTA: "Start a migration" -> `/migrations`.
-- Trust: "MIT licensed. Your data stays in your Postgres."
+- Trust: "BSL 1.1 licensed (converts to MIT 2030). Your data stays in your Postgres."
 
 ## GitHub hygiene
 

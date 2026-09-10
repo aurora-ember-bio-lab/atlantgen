@@ -532,7 +532,7 @@ docker compose up -d --build
             <a href="/ads-disclosure" className="hover:text-amber-400">Ads</a>
             <a href="https://github.com/cargounetcom/aura-amber-saas" className="hover:text-amber-400">GitHub</a>
           </div>
-          <div className="text-xs text-neutral-600">MIT License © 2026 Aurora Ember Bio Lab Ltd.</div>
+          <div className="text-xs text-neutral-600">BSL 1.1 — converts to MIT 2030 · © 2026 Aurora Ember Bio Lab Ltd.</div>
         </div>
       </footer>
     </div>

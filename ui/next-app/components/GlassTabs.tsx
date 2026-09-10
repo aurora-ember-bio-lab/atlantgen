@@ -186,11 +186,15 @@ export default function GlassTabs() {
 
             {activeTab === "license" && (
               <div className="max-w-3xl mx-auto">
-                <h3 className="mb-4 text-2xl font-bold">MIT License</h3>
-                <p className="mb-4 text-xs text-neutral-500">Copyright © 2026 Aurora Ember Bio Lab Ltd.</p>
+                <h3 className="mb-4 text-2xl font-bold">Business Source License 1.1</h3>
+                <p className="mb-4 text-xs text-neutral-500">Copyright © 2026 Aurora Ember Bio Lab Ltd. Converts to MIT on 2030-09-10.</p>
                 <div className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-6 text-sm text-neutral-400 leading-relaxed font-mono">
-                  <p>Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the &quot;Software&quot;), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software.</p>
-                  <p className="mt-4">THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND.</p>
+                  <p>Licensor: Aurora Ember Bio Lab Ltd.</p>
+                  <p>Licensed Work: Aura Amber Migration SaaS</p>
+                  <p className="mt-2">You may use, copy, modify, and distribute the Licensed Work, solely as part of a product or service you offer.</p>
+                  <p className="mt-2">You may NOT offer a competing product or service that provides the same or substantially similar functionality.</p>
+                  <p className="mt-2">Self-hosting for internal business purposes is permitted.</p>
+                  <p className="mt-4">On the Change Date (2030-09-10), this license converts to the MIT License.</p>
                 </div>
                 <p className="mt-4 text-xs text-neutral-500">Full text: <a href="/license" className="text-amber-400 hover:underline">LICENSE</a></p>
               </div>
@@ -221,7 +225,7 @@ export default function GlassTabs() {
                 <h3 className="mb-4 text-2xl font-bold">Disclaimer</h3>
                 <p className="mb-4 text-xs text-neutral-500">Last updated: 10 Sep 2026</p>
                 <div className="space-y-4 text-sm text-neutral-300 leading-relaxed">
-                  <p>Aura Amber is provided under the MIT License <strong className="text-neutral-100">&quot;as is&quot;</strong>, without warranty.</p>
+                  <p>Aura Amber is provided under the Business Source License 1.1 (BSL 1.1) <strong className="text-neutral-100">&quot;as is&quot;</strong>, without warranty. Converts to MIT on 2030-09-10.</p>
                   <ul className="list-disc pl-5 space-y-2 text-neutral-400">
                     <li>Always run a trial migration first</li>
                     <li>Back up your source store and target database</li>

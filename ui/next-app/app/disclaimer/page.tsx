@@ -6,7 +6,7 @@ export default function DisclaimerPage() {
       <h1 className="mb-4 text-2xl font-semibold text-neutral-100">Disclaimer</h1>
       <p className="text-neutral-500">Last updated: 10 Sep 2026</p>
       <div className="mt-6 space-y-3 text-neutral-400">
-        <p>Aura Amber is provided under the MIT License “as is”, without warranty. Always run a trial migration and back up your source store and target database first.</p>
+        <p>Aura Amber is provided under the Business Source License 1.1 (BSL 1.1) &quot;as is&quot;, without warranty. Converts to MIT on 2030-09-10. Always run a trial migration and back up your source store and target database first.</p>
         <p>SEO, theme fidelity, and plugin parity vary by source platform and require manual review after migration.</p>
         <p>Pricing on the site is informational; the Stripe Checkout price at payment time governs.</p>
       </div>

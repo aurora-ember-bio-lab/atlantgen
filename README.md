@@ -136,4 +136,4 @@ See `.env.example` for all required variables:
 
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+BSL 1.1 (Business Source License) — converts to MIT on 2030-09-10. See [LICENSE](./LICENSE).
