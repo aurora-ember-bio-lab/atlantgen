@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import GlassTabs from "./GlassTabs";
+import DemoDashboard from "./DemoDashboard";
 
 const connectors = [
   { id: "wordpress", name: "WordPress", icon: "W", color: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
@@ -457,6 +458,24 @@ table "orders" {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Live Demo ─────────────────────────────────────────────── */}
+      <section id="demo" className="py-24">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="mb-12 text-center">
+            <h2 className="text-3xl font-bold md:text-4xl">
+              See it in action
+            </h2>
+            <p className="mt-3 text-neutral-400">
+              Live dashboard with real-time migration progress, connector status, and record counts.
+            </p>
+          </div>
+          <DemoDashboard />
+          <p className="mt-4 text-center text-xs text-neutral-600">
+            Animated demo — connect your own store to see real data
+          </p>
         </div>
       </section>
 
