@@ -66,7 +66,35 @@ Invoke-RestMethod -Uri http://localhost:8090/enqueue -Method Post -ContentType '
 
 Why: `curl.exe -d "{\"a\":1}"` mangles JSON under PowerShell. `Invoke-RestMethod` is reliable.
 
-## 6. Code checks
+## 6. CLI self-test (no real credentials needed)
+
+```powershell
+.\aura-amber.exe test
+# → checks API, Worker, PostgreSQL, Redis, migrations endpoint, connectors endpoint, dry migration create
+```
+
+## 7. CLI migrate with real credentials
+
+```powershell
+# WordPress
+.\aura-amber.exe migrate wordpress --url https://my-site.com --user admin --pass xxxx
+
+# Shopify
+.\aura-amber.exe migrate shopify --url my-shop.myshopify.com --pass shpat_xxxx
+
+# WooCommerce
+.\aura-amber.exe migrate woocommerce --url https://my-site.com --user ck_xxxx --pass cs_xxxx
+
+# Magento
+.\aura-amber.exe migrate magento --url https://my-site.com --pass bpat_xxxx
+
+# Custom target DB
+.\aura-amber.exe migrate wordpress --url https://my-site.com --user admin --pass xxxx --target "postgres://user:pass@host:5432/dbname?sslmode=disable"
+```
+
+Without flags, the CLI shows required fields for the source type.
+
+## 8. Code checks
 
 ```powershell
 go vet ./...
@@ -76,7 +104,7 @@ cd ui/next-app; npm run lint; npm run build
 cd ../../worker; npm run build
 ```
 
-## 7. Local dev without Docker
+## 9. Local dev without Docker
 
 ```powershell
 # terminal 1: postgres + redis must already run locally
@@ -91,7 +119,7 @@ Inside Docker the API must use `WORKER_URL=http://worker:8090`
 (localhost inside a container points at itself). This is now set in
 `docker-compose.yml`.
 
-## 8. Known issues fixed 2026-09-10
+## 10. Known issues fixed 2026-09-10
 
 - `worker: Cannot find module './queue.js'` — fixed by `"type":"module"` + `tsx` dev + `tsc build` + `node dist` start.
 - `aura-worker` never listening on :8090 — fixed by `EXPOSE 8090` + `ports: 8090:8090`.

@@ -2,7 +2,7 @@
 ; Compile with Inno Setup 6+
 
 #define MyAppName "Aura Amber"
-#define MyAppVersion "0.2.0"
+#define MyAppVersion "0.3.0"
 #define MyAppPublisher "Aurora Ember Bio Lab Ltd."
 #define MyAppURL "https://github.com/cargounetcom/aura-amber-saas"
 #define MyAppExeName "aura-amber.exe"

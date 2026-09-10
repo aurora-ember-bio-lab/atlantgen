@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	version     = "0.2.0"
+	version     = "0.3.0"
 	appName     = "Aura Amber"
 	defaultAPI  = "http://localhost:8080"
 	defaultUI   = "http://localhost:3000"
@@ -39,6 +39,8 @@ func main() {
 		cmdOpen()
 	case "migrate":
 		cmdMigrate()
+	case "test":
+		cmdTest()
 	case "version":
 		fmt.Printf("aura-amber %s\n", version)
 	case "help":
@@ -57,19 +59,33 @@ Usage:
   aura-amber <command> [options]
 
 Commands:
-  start           Start all services (Docker required)
-  stop            Stop all services
-  status          Show status of all services
-  open            Open dashboard in default browser
-  migrate <type>  Start a migration (wordpress|shopify|woocommerce|magento)
-  version         Show version
-  help            Show this help
+  start                          Start all services (Docker required)
+  stop                           Stop all services
+  status                         Show status of all services
+  open                           Open dashboard in default browser
+  migrate <type> [flags]         Start a migration
+  test                           Run self-test (no real credentials needed)
+  version                        Show version
+  help                           Show this help
+
+Migration flags:
+  --url <url>                    Source base URL
+  --user <username>              Username / consumer key
+  --pass <password>              Password / consumer secret / access token
+  --target <db-url>              Target PostgreSQL URL (default: local)
+
+Sources:
+  wordpress      --url https://my-site.com --user admin --pass xxxx
+  shopify        --url my-shop.myshopify.com --pass shpat_xxxx
+  woocommerce    --url https://my-site.com --user ck_xxxx --pass cs_xxxx
+  magento        --url https://my-site.com --pass bpat_xxxx
 
 Examples:
   aura-amber start
   aura-amber status
   aura-amber open
-  aura-amber migrate wordpress
+  aura-amber migrate wordpress --url https://my-site.com --user admin --pass xxxx
+  aura-amber test
 
 `, appName, version)
 }
@@ -130,22 +146,41 @@ func cmdOpen() {
 
 func cmdMigrate() {
 	if len(os.Args) < 3 {
-		fmt.Fprintln(os.Stderr, "Usage: aura-amber migrate <wordpress|shopify|woocommerce|magento>")
+		fmt.Fprintln(os.Stderr, "Usage: aura-amber migrate <wordpress|shopify|woocommerce|magento> [flags]")
+		fmt.Fprintln(os.Stderr, "Run 'aura-amber help' for details.")
 		os.Exit(1)
 	}
+
 	source := os.Args[2]
 	valid := map[string]bool{"wordpress": true, "shopify": true, "woocommerce": true, "magento": true}
 	if !valid[source] {
-		fmt.Fprintf(os.Stderr, "Invalid source: %s. Use: wordpress, shopify, woocommerce, magento\n", source)
+		fmt.Fprintf(os.Stderr, "Invalid source: %s\nValid sources: wordpress, shopify, woocommerce, magento\n", source)
 		os.Exit(1)
+	}
+
+	// Parse flags
+	flags := parseFlags()
+	connInfo := buildConnectionInfo(source, flags)
+
+	// Validate required fields
+	if err := validateConnection(source, connInfo); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n\n", err)
+		fmt.Fprintf(os.Stderr, "Required fields for %s:\n", source)
+		printRequiredFields(source)
+		os.Exit(1)
+	}
+
+	targetDb := flags["target"]
+	if targetDb == "" {
+		targetDb = "postgres://aura:aura@localhost:5432/aura_amber?sslmode=disable"
 	}
 
 	fmt.Printf("Starting %s migration...\n", source)
 	payload := map[string]interface{}{
 		"name":                 fmt.Sprintf("%s-migration-%d", source, time.Now().UnixMilli()),
 		"sourceType":           source,
-		"sourceConnectionInfo": map[string]string{},
-		"targetDbUrl":          "postgres://aura:aura@localhost:5432/aura_amber?sslmode=disable",
+		"sourceConnectionInfo": connInfo,
+		"targetDbUrl":          targetDb,
 	}
 
 	body, _ := json.Marshal(payload)
@@ -167,6 +202,166 @@ func cmdMigrate() {
 	} else {
 		fmt.Fprintf(os.Stderr, "Migration failed: %v\n", result["error"])
 		os.Exit(1)
+	}
+}
+
+func cmdTest() {
+	fmt.Println("Running self-test...")
+	fmt.Println()
+
+	// Test 1: API health
+	fmt.Print("  API health... ")
+	if checkHealth(defaultAPI + "/health") {
+		fmt.Println("✓ OK")
+	} else {
+		fmt.Println("✗ DOWN")
+	}
+
+	// Test 2: Worker health
+	fmt.Print("  Worker health... ")
+	if checkHealth(defaultWork + "/health") {
+		fmt.Println("✓ OK")
+	} else {
+		fmt.Println("✗ DOWN")
+	}
+
+	// Test 3: Database
+	fmt.Print("  PostgreSQL... ")
+	if portOpen("5432") {
+		fmt.Println("✓ OK")
+	} else {
+		fmt.Println("✗ DOWN")
+	}
+
+	// Test 4: Redis
+	fmt.Print("  Redis... ")
+	if portOpen("6379") {
+		fmt.Println("✓ OK")
+	} else {
+		fmt.Println("✗ DOWN")
+	}
+
+	// Test 5: List migrations
+	fmt.Print("  GET /api/migrations... ")
+	resp, err := http.Get(defaultAPI + "/api/migrations")
+	if err == nil && resp.StatusCode == 200 {
+		fmt.Println("✓ OK")
+		resp.Body.Close()
+	} else {
+		fmt.Println("✗ FAIL")
+	}
+
+	// Test 6: List connectors
+	fmt.Print("  GET /api/connectors... ")
+	resp2, err := http.Get(defaultAPI + "/api/connectors")
+	if err == nil && resp2.StatusCode == 200 {
+		var connectors []map[string]interface{}
+		json.NewDecoder(resp2.Body).Decode(&connectors)
+		resp2.Body.Close()
+		fmt.Printf("✓ OK (%d connectors)\n", len(connectors))
+	} else {
+		fmt.Println("✗ FAIL")
+	}
+
+	// Test 7: Create + immediately check a test migration
+	fmt.Print("  POST /api/migrations (dry)... ")
+	testPayload := map[string]interface{}{
+		"name":                 fmt.Sprintf("test-%d", time.Now().UnixMilli()),
+		"sourceType":           "wordpress",
+		"sourceConnectionInfo": map[string]string{"baseUrl": "http://test.example.com", "username": "test", "appPassword": "test"},
+		"targetDbUrl":          "postgres://aura:aura@localhost:5432/aura_amber?sslmode=disable",
+	}
+	testBody, _ := json.Marshal(testPayload)
+	resp3, err := http.Post(defaultAPI+"/api/migrations", "application/json", bytes.NewReader(testBody))
+	if err == nil && resp3.StatusCode == 201 {
+		fmt.Println("✓ OK (migration created, will fail at worker — expected)")
+		resp3.Body.Close()
+	} else if err == nil {
+		fmt.Printf("✗ FAIL (status %d)\n", resp3.StatusCode)
+		resp3.Body.Close()
+	} else {
+		fmt.Println("✗ FAIL")
+	}
+
+	fmt.Println()
+	fmt.Println("Self-test complete.")
+}
+
+func parseFlags() map[string]string {
+	flags := map[string]string{}
+	for i := 3; i < len(os.Args)-1; i++ {
+		if strings.HasPrefix(os.Args[i], "--") {
+			key := strings.TrimPrefix(os.Args[i], "--")
+			flags[key] = os.Args[i+1]
+			i++
+		}
+	}
+	return flags
+}
+
+func buildConnectionInfo(source string, flags map[string]string) map[string]string {
+	info := map[string]string{}
+	url := flags["url"]
+	user := flags["user"]
+	pass := flags["pass"]
+
+	switch source {
+	case "wordpress":
+		info["baseUrl"] = url
+		info["username"] = user
+		info["appPassword"] = pass
+	case "shopify":
+		info["shopDomain"] = url
+		info["accessToken"] = pass
+	case "woocommerce":
+		info["baseUrl"] = url
+		info["consumerKey"] = user
+		info["consumerSecret"] = pass
+	case "magento":
+		info["baseUrl"] = url
+		info["accessToken"] = pass
+	}
+	return info
+}
+
+func validateConnection(source string, info map[string]string) error {
+	switch source {
+	case "wordpress":
+		if info["baseUrl"] == "" || info["username"] == "" || info["appPassword"] == "" {
+			return fmt.Errorf("wordpress requires --url, --user, --pass")
+		}
+	case "shopify":
+		if info["shopDomain"] == "" || info["accessToken"] == "" {
+			return fmt.Errorf("shopify requires --url (shop domain) and --pass (access token)")
+		}
+	case "woocommerce":
+		if info["baseUrl"] == "" || info["consumerKey"] == "" || info["consumerSecret"] == "" {
+			return fmt.Errorf("woocommerce requires --url, --user (consumer key), --pass (consumer secret)")
+		}
+	case "magento":
+		if info["baseUrl"] == "" || info["accessToken"] == "" {
+			return fmt.Errorf("magento requires --url and --pass (access token)")
+		}
+	}
+	return nil
+}
+
+func printRequiredFields(source string) {
+	switch source {
+	case "wordpress":
+		fmt.Println("  --url      WordPress site URL (e.g. https://my-site.com)")
+		fmt.Println("  --user     WordPress username")
+		fmt.Println("  --pass     Application password")
+	case "shopify":
+		fmt.Println("  --url      Shop domain (e.g. my-shop.myshopify.com)")
+		fmt.Println("  --pass     Admin API access token")
+	case "woocommerce":
+		fmt.Println("  --url      WooCommerce site URL (e.g. https://my-site.com)")
+		fmt.Println("  --user     Consumer key")
+		fmt.Println("  --pass     Consumer secret")
+	case "magento":
+		fmt.Println("  --url      Magento site URL (e.g. https://my-site.com)")
+		fmt.Println("  --pass     Integration access token")
 	}
 }
 
@@ -216,9 +411,7 @@ func openBrowser(url string) {
 	cmd.Start()
 }
 
-// init project directory detection
 func init() {
-	// Try to find docker-compose.yml in current or parent dirs
 	if _, err := os.Stat("docker-compose.yml"); err != nil {
 		if _, err := os.Stat("../docker-compose.yml"); err == nil {
 			os.Chdir("..")
