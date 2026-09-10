@@ -3,10 +3,10 @@
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { label: "Dashboard", href: "/" },
-  { label: "Migrations", href: "/migrations" },
-  { label: "Connectors", href: "/connectors" },
-  { label: "Settings", href: "/settings" },
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Migrations", href: "/dashboard/migrations" },
+  { label: "Connectors", href: "/dashboard/connectors" },
+  { label: "Settings", href: "/dashboard/settings" },
 ];
 
 export default function Sidebar() {
@@ -15,17 +15,19 @@ export default function Sidebar() {
   return (
     <aside className="hidden w-64 shrink-0 border-r border-neutral-800 bg-neutral-950 px-6 py-8 md:block">
       <div className="mb-10 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500 text-sm font-bold text-neutral-950">
-          A
-        </div>
-        <span className="text-lg font-semibold tracking-tight text-neutral-100">
-          Aura Amber
-        </span>
+        <a href="/" className="flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-amber-500 text-sm font-bold text-neutral-950">
+            A
+          </div>
+          <span className="text-lg font-semibold tracking-tight text-neutral-100">
+            Aura Amber
+          </span>
+        </a>
       </div>
 
       <nav className="space-y-1">
         {navItems.map((item) => {
-          const active = pathname === item.href;
+          const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
           return (
             <a
               key={item.href}

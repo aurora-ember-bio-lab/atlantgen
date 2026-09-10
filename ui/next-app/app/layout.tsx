@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "Aura Amber — Migration Dashboard",
+  title: "Aura Amber — Migrate your store without losing a beat",
   description:
     "WordPress / Shopify / WooCommerce / Magento → Next.js + MedusaJS + PostgreSQL migration platform",
 };
@@ -16,10 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-neutral-950 text-neutral-100 antialiased">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 px-6 py-8 md:px-10">{children}</main>
-        </div>
+        {children}
       </body>
     </html>
   );
