@@ -19,6 +19,7 @@ func main() {
 
 	app.Use(logger.New())
 	app.Use(cors.New())
+	app.Use(api.APIKeyMiddleware())
 
 	// Initialize database connection
 	dbURL := os.Getenv("DB_URL")
