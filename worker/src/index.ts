@@ -30,13 +30,13 @@ const worker = new Worker<MigrationJobData>(
     const raw = await extract(sourceConnectionInfo);
 
     await job.updateProgress(50);
-    const normalized = normalizeData(raw, sourceType);
+    const { products, orders, customers } = normalizeData(raw, sourceType);
 
     await job.updateProgress(75);
-    await uploadData(normalized, targetDbUrl);
+    await uploadData(products, orders, customers, targetDbUrl);
 
     await job.updateProgress(100);
-    return { status: "completed", records: normalized.length };
+    return { status: "completed", records: { products: products.length, orders: orders.length, customers: customers.length } };
   },
   { connection },
 );

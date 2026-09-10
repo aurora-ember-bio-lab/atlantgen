@@ -8,3 +8,5 @@ release/
 .env*.local
 *.log
 .DS_Store
+aura-amber-api.exe
+tsconfig.tsbuildinfo

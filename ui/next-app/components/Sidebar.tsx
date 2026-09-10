@@ -50,6 +50,13 @@ export default function Sidebar() {
           → Next.js + MedusaJS + PostgreSQL
         </p>
       </div>
+
+      <div className="mt-6 flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+        <a href="/privacy" className="hover:text-amber-400">Privacy</a>
+        <a href="/cookies" className="hover:text-amber-400">Cookies</a>
+        <a href="/disclaimer" className="hover:text-amber-400">Disclaimer</a>
+        <a href="/ads-disclosure" className="hover:text-amber-400">Ads</a>
+      </div>
     </aside>
   );
 }

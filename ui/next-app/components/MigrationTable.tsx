@@ -1,4 +1,4 @@
-import { Migration, sourceLabels, statusStyles } from "@/lib/mock-data";
+import { Migration, sourceLabels, statusStyles } from "@/lib/migration-types";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-IE", {

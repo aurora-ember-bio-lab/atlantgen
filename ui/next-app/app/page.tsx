@@ -1,8 +1,28 @@
+import { get } from "@/lib/api-client";
 import StatCard from "@/components/StatCard";
 import MigrationTable from "@/components/MigrationTable";
-import { mockMigrations, summaryStats } from "@/lib/mock-data";
+import { Migration } from "@/lib/migration-types";
 
-export default function DashboardPage() {
+export const dynamic = "force-dynamic";
+
+export default async function DashboardPage() {
+  let migrations: Migration[] = [];
+  try {
+    migrations = await get("/api/migrations");
+  } catch {
+    migrations = [];
+  }
+
+  const stats = {
+    active: migrations.filter((m) => m.status === "running").length,
+    completed: migrations.filter((m) => m.status === "completed").length,
+    failed: migrations.filter((m) => m.status === "failed").length,
+    recordsMigrated: migrations.reduce(
+      (sum: number, m: Migration) => sum + m.recordsMigrated,
+      0
+    ),
+  };
+
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8 flex items-center justify-between">
@@ -20,19 +40,19 @@ export default function DashboardPage() {
       </div>
 
       <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Active" value={summaryStats.active} tone="amber" />
-        <StatCard label="Completed" value={summaryStats.completed} tone="emerald" />
-        <StatCard label="Failed" value={summaryStats.failed} tone="red" />
+        <StatCard label="Active" value={stats.active} tone="amber" />
+        <StatCard label="Completed" value={stats.completed} tone="emerald" />
+        <StatCard label="Failed" value={stats.failed} tone="red" />
         <StatCard
           label="Records Migrated"
-          value={summaryStats.recordsMigrated.toLocaleString("en-IE")}
+          value={stats.recordsMigrated.toLocaleString("en-IE")}
         />
       </div>
 
       <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-neutral-500">
         Recent Migrations
       </h2>
-      <MigrationTable migrations={mockMigrations} />
+      <MigrationTable migrations={migrations} />
     </div>
   );
 }

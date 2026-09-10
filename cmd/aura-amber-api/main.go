@@ -21,8 +21,10 @@ func main() {
 	})
 
 	api.RegisterMigrations(app)
+	api.RegisterConnectors(app)
 	api.RegisterSchema(app)
 	api.RegisterGitHubWebhooks(app)
+	api.RegisterBilling(app)
 
 	log.Fatal(app.Listen(":8080"))
 }

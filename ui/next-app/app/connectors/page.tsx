@@ -1,8 +1,5 @@
-import {
-  connectorStateLabels,
-  connectorStateStyles,
-  mockConnectors,
-} from "@/lib/mock-connectors";
+import { get } from "@/lib/api-client";
+import { connectorStateLabels, connectorStateStyles } from "@/lib/connector-types";
 
 function formatDate(iso?: string) {
   if (!iso) return "Never";
@@ -14,7 +11,24 @@ function formatDate(iso?: string) {
   });
 }
 
-export default function ConnectorsPage() {
+interface Connector {
+  id: string;
+  name: string;
+  description: string;
+  state: string;
+  lastSync?: string;
+}
+
+export const dynamic = "force-dynamic";
+
+export default async function ConnectorsPage() {
+  let connectors: Connector[] = [];
+  try {
+    connectors = await get("/api/connectors");
+  } catch {
+    connectors = [];
+  }
+
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
@@ -25,17 +39,19 @@ export default function ConnectorsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {mockConnectors.map((c) => (
+        {connectors.map((c) => (
           <div
             key={c.id}
             className="rounded-lg border border-neutral-800 bg-neutral-900/40 p-5"
           >
             <div className="flex items-start justify-between">
-              <h2 className="text-base font-semibold text-neutral-100">{c.name}</h2>
+              <h2 className="text-base font-semibold text-neutral-100">
+                {c.name}
+              </h2>
               <span
-                className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${connectorStateStyles[c.state]}`}
+                className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${connectorStateStyles[c.state as keyof typeof connectorStateStyles]}`}
               >
-                {connectorStateLabels[c.state]}
+                {connectorStateLabels[c.state as keyof typeof connectorStateLabels]}
               </span>
             </div>
             <p className="mt-2 text-sm text-neutral-400">{c.description}</p>
