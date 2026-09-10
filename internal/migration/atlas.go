@@ -10,7 +10,7 @@ import (
 	"os/exec"
 )
 
-const defaultSchemaPath = "internal/migration/schema.hcl"
+const defaultSchemaPath = "atlas/schema.hcl"
 
 // ApplySchema runs `atlas schema apply`, bringing targetDBURL's schema in
 // line with the HCL definition at schemaPath (defaultSchemaPath if empty).

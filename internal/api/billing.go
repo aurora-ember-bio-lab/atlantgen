@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"os"
 	"time"
 
@@ -24,6 +25,10 @@ func RegisterBilling(app *fiber.App) {
 // createCheckout creates a Stripe Checkout Session for a subscription.
 // POST body: { login, plan, email }
 func createCheckout(c *fiber.Ctx) error {
+	if stripe.Key == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "billing not configured (STRIPE_SECRET_KEY missing)"})
+	}
+
 	var req struct {
 		Login string `json:"login"`
 		Plan  string `json:"plan"`
@@ -36,18 +41,22 @@ func createCheckout(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "login and plan are required"})
 	}
 
-	acct, exists := accounts[req.Login]
-	if !exists {
+	acct, err := getAccount(req.Login)
+	if err != nil || acct == nil {
 		acct = &Account{
-			Login:     req.Login,
+			Login:      req.Login,
 			SourceType: "github_marketplace",
-			Status:    "active",
-			CreatedAt: time.Now().UTC(),
+			Status:     "active",
+			CreatedAt:  time.Now().UTC(),
 		}
-		accounts[req.Login] = acct
+		upsertAccount(acct)
 	}
 
 	priceID := os.Getenv("STRIPE_PRICE_ID_PLAN_BASIC")
+	if priceID == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "billing not configured (STRIPE_PRICE_ID_PLAN_BASIC missing)"})
+	}
+
 	params := &stripe.CheckoutSessionParams{
 		PaymentMethodTypes: []*string{stripe.String("card")},
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
@@ -81,6 +90,10 @@ func createCheckout(c *fiber.Ctx) error {
 // createCustomer creates a Stripe customer for a marketplace account.
 // POST body: { login, email, plan }
 func createCustomer(c *fiber.Ctx) error {
+	if stripe.Key == "" {
+		return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": "billing not configured (STRIPE_SECRET_KEY missing)"})
+	}
+
 	var req struct {
 		Login string `json:"login"`
 		Email string `json:"email"`
@@ -93,14 +106,13 @@ func createCustomer(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "login and email are required"})
 	}
 
-	acct, exists := accounts[req.Login]
-	if !exists {
+	acct, err := getAccount(req.Login)
+	if err != nil || acct == nil {
 		acct = &Account{
-			Login:     req.Login,
+			Login:      req.Login,
 			SourceType: "github_marketplace",
-			CreatedAt: time.Now().UTC(),
+			CreatedAt:  time.Now().UTC(),
 		}
-		accounts[req.Login] = acct
 	}
 
 	params := &stripe.CustomerParams{
@@ -120,22 +132,27 @@ func createCustomer(c *fiber.Ctx) error {
 
 	acct.StripeCustomerID = stripeCust.ID
 	acct.Status = "active"
+	acct.Email = req.Email
+	upsertAccount(acct)
 
 	return c.JSON(fiber.Map{
-		"status":    "customer_created",
+		"status":     "customer_created",
 		"customerId": stripeCust.ID,
-		"login":     req.Login,
-		"email":     req.Email,
-		"plan":      req.Plan,
+		"login":      req.Login,
+		"email":      req.Email,
+		"plan":       req.Plan,
 	})
 }
 
 // getBillingAccount returns the billing status for a GitHub account.
 func getBillingAccount(c *fiber.Ctx) error {
 	login := c.Params("login")
-	acct, exists := accounts[login]
-	if !exists {
+	acct, err := getAccount(login)
+	if err == sql.ErrNoRows || acct == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "account not found"})
+	}
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{
 		"login":     acct.Login,

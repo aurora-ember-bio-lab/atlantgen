@@ -3,8 +3,10 @@ package api
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"time"
 
@@ -47,16 +49,84 @@ type installationEvent struct {
 
 // Account represents a migrated account stored in Postgres.
 type Account struct {
-	Login              string    `json:"login"`
-	SourceType         string    `json:"source_type"`
-	StripeCustomerID   string    `json:"stripe_customer_id,omitempty"`
-	GitHubInstallationID int64   `json:"github_installation_id,omitempty"`
-	Status             string    `json:"status"`
-	PlanName           string    `json:"plan_name,omitempty"`
-	CreatedAt          time.Time `json:"created_at"`
+	Login                string    `json:"login"`
+	SourceType           string    `json:"source_type"`
+	StripeCustomerID     string    `json:"stripe_customer_id,omitempty"`
+	GitHubInstallationID int64     `json:"github_installation_id,omitempty"`
+	Status               string    `json:"status"`
+	PlanName             string    `json:"plan_name,omitempty"`
+	Email                string    `json:"email,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
-var accounts = make(map[string]*Account)
+var accountsDB *sql.DB
+
+// InitAccountsDB initializes the database connection for accounts.
+func InitAccountsDB(conn *sql.DB) {
+	accountsDB = conn
+}
+
+func upsertAccount(acct *Account) error {
+	if accountsDB == nil {
+		return nil
+	}
+
+	_, err := accountsDB.Exec(`
+		INSERT INTO accounts (id, login, source_type, stripe_customer_id, github_installation_id, status, plan_name, email, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
+		ON CONFLICT (login) DO UPDATE SET
+			stripe_customer_id = COALESCE(NULLIF(EXCLUDED.stripe_customer_id, ''), accounts.stripe_customer_id),
+			github_installation_id = COALESCE(NULLIF(EXCLUDED.github_installation_id, 0), accounts.github_installation_id),
+			status = EXCLUDED.status,
+			plan_name = COALESCE(NULLIF(EXCLUDED.plan_name, ''), accounts.plan_name),
+			email = COALESCE(NULLIF(EXCLUDED.email, ''), accounts.email),
+			updated_at = now()
+	`, generateUUID(), acct.Login, acct.SourceType, acct.StripeCustomerID, acct.GitHubInstallationID, acct.Status, acct.PlanName, acct.Email, time.Now().UTC())
+
+	return err
+}
+
+func getAccount(login string) (*Account, error) {
+	if accountsDB == nil {
+		return nil, sql.ErrNoRows
+	}
+
+	acct := &Account{}
+	var stripeID, planName, email sql.NullString
+	var ghID sql.NullInt64
+
+	err := accountsDB.QueryRow(`
+		SELECT login, source_type, stripe_customer_id, github_installation_id, status, plan_name, email, created_at
+		FROM accounts WHERE login = $1
+	`, login).Scan(&acct.Login, &acct.SourceType, &stripeID, &ghID, &acct.Status, &planName, &email, &acct.CreatedAt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if stripeID.Valid {
+		acct.StripeCustomerID = stripeID.String
+	}
+	if planName.Valid {
+		acct.PlanName = planName.String
+	}
+	if email.Valid {
+		acct.Email = email.String
+	}
+	if ghID.Valid {
+		acct.GitHubInstallationID = ghID.Int64
+	}
+	return acct, nil
+}
+
+func generateUUID() string {
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		time.Now().UnixNano()%0xFFFFFFFF,
+		time.Now().UnixNano()%0xFFFF,
+		time.Now().UnixNano()%0xFFFF,
+		time.Now().UnixNano()%0xFFFF,
+		time.Now().UnixNano()%0xFFFFFFFFFFFF)
+}
 
 func handleGitHubWebhook(c *fiber.Ctx) error {
 	body := c.Body()
@@ -99,33 +169,33 @@ func handleMarketplacePurchase(c *fiber.Ctx, body []byte) error {
 	switch evt.Action {
 	case "purchased":
 		acct := &Account{
-			Login:     login,
+			Login:      login,
 			SourceType: "github_marketplace",
-			Status:    "active",
-			PlanName:  planName,
-			CreatedAt: time.Now().UTC(),
+			Status:     "active",
+			PlanName:   planName,
+			CreatedAt:  time.Now().UTC(),
 		}
-		accounts[login] = acct
-		c.JSON(fiber.Map{"status": "activated", "account": acct})
+		upsertAccount(acct)
+		return c.JSON(fiber.Map{"status": "activated", "account": acct})
 	case "changed":
-		acct, exists := accounts[login]
-		if !exists {
+		acct, err := getAccount(login)
+		if err != nil {
 			acct = &Account{Login: login, SourceType: "github_marketplace", CreatedAt: time.Now().UTC()}
-			accounts[login] = acct
 		}
 		acct.PlanName = planName
 		acct.Status = "active"
-		c.JSON(fiber.Map{"status": "updated", "account": acct})
+		upsertAccount(acct)
+		return c.JSON(fiber.Map{"status": "updated", "account": acct})
 	case "cancelled":
-		acct, exists := accounts[login]
-		if !exists {
-			c.JSON(fiber.Map{"status": "not_found"})
-			return c.SendStatus(fiber.StatusOK)
+		acct, err := getAccount(login)
+		if err != nil {
+			return c.JSON(fiber.Map{"status": "not_found"})
 		}
 		acct.Status = "cancelled"
-		c.JSON(fiber.Map{"status": "cancelled", "account": acct})
+		upsertAccount(acct)
+		return c.JSON(fiber.Map{"status": "cancelled", "account": acct})
 	case "pending_change", "pending_change_cancelled":
-		c.JSON(fiber.Map{"status": "pending"})
+		return c.JSON(fiber.Map{"status": "pending"})
 	}
 
 	return c.SendStatus(fiber.StatusOK)
@@ -144,35 +214,30 @@ func handleInstallation(c *fiber.Ctx, body []byte) error {
 	case "created":
 		acct := &Account{
 			Login:                login,
-			SourceType:          "github",
+			SourceType:           "github",
 			GitHubInstallationID: installationID,
-			Status:              "active",
-			CreatedAt:           time.Now().UTC(),
+			Status:               "active",
+			CreatedAt:            time.Now().UTC(),
 		}
-		accounts[login] = acct
-		c.JSON(fiber.Map{"status": "recorded", "account": acct})
+		upsertAccount(acct)
+		return c.JSON(fiber.Map{"status": "recorded", "account": acct})
 	case "deleted", "suspend":
-		acct, exists := accounts[login]
-		if !exists {
-			c.JSON(fiber.Map{"status": "not_found"})
-			return c.SendStatus(fiber.StatusOK)
+		acct, err := getAccount(login)
+		if err != nil {
+			return c.JSON(fiber.Map{"status": "not_found"})
 		}
 		acct.Status = "suspended"
-		c.JSON(fiber.Map{"status": "revoked", "account": acct})
+		upsertAccount(acct)
+		return c.JSON(fiber.Map{"status": "revoked", "account": acct})
 	case "unsuspend":
-		acct, exists := accounts[login]
-		if !exists {
-			c.JSON(fiber.Map{"status": "not_found"})
-			return c.SendStatus(fiber.StatusOK)
+		acct, err := getAccount(login)
+		if err != nil {
+			return c.JSON(fiber.Map{"status": "not_found"})
 		}
 		acct.Status = "active"
-		c.JSON(fiber.Map{"status": "restored", "account": acct})
+		upsertAccount(acct)
+		return c.JSON(fiber.Map{"status": "restored", "account": acct})
 	}
 
 	return c.SendStatus(fiber.StatusOK)
-}
-
-// GetAccounts returns all tracked accounts for the dashboard.
-func GetAccounts() map[string]*Account {
-	return accounts
 }

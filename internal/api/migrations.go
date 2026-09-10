@@ -1,6 +1,8 @@
 package api
 
 import (
+	"os"
+
 	"github.com/gofiber/fiber/v2"
 
 	"aura-amber-saas/internal/migration"
@@ -13,16 +15,25 @@ type createMigrationRequest struct {
 	TargetDBURL          string            `json:"targetDbUrl"`
 }
 
-// RegisterMigrations wires the migration-job endpoints. Creating a job here
-// also hands it off to the worker (worker/src/index.ts) over HTTP so it
-// actually runs — see internal/migration/worker_client.go.
+// RegisterMigrations wires the migration-job endpoints.
 func RegisterMigrations(app *fiber.App) {
 	app.Get("/api/migrations", listMigrations)
+	app.Get("/api/migrations/:id", getMigration)
 	app.Post("/api/migrations", createMigration)
+	app.Delete("/api/migrations/:id", deleteMigration)
 }
 
 func listMigrations(c *fiber.Ctx) error {
 	return c.JSON(migration.ListJobs())
+}
+
+func getMigration(c *fiber.Ctx) error {
+	id := c.Params("id")
+	job := migration.GetJob(id)
+	if job == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "migration not found"})
+	}
+	return c.JSON(job)
 }
 
 func createMigration(c *fiber.Ctx) error {
@@ -32,6 +43,14 @@ func createMigration(c *fiber.Ctx) error {
 	}
 	if req.Name == "" || req.SourceType == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "name and sourceType are required"})
+	}
+
+	// Default targetDbUrl to DATABASE_URL env var if not provided
+	if req.TargetDBURL == "" {
+		req.TargetDBURL = os.Getenv("DATABASE_URL")
+	}
+	if req.TargetDBURL == "" {
+		req.TargetDBURL = "postgres://aura:aura@localhost:5432/aura_amber?sslmode=disable"
 	}
 
 	job := migration.EnqueueJob(migration.Job{
@@ -51,4 +70,12 @@ func createMigration(c *fiber.Ctx) error {
 	migration.SetWorkerJobID(job.ID, workerJobID)
 
 	return c.Status(fiber.StatusCreated).JSON(job)
+}
+
+func deleteMigration(c *fiber.Ctx) error {
+	id := c.Params("id")
+	if migration.DeleteJob(id) {
+		return c.JSON(fiber.Map{"status": "deleted", "id": id})
+	}
+	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "migration not found"})
 }

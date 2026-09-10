@@ -1,27 +1,53 @@
-schema "public" {
-  charset = "utf8"
-}
+schema "public" {}
 
 table "migrations" {
+  schema = schema.public
+
   column "id" {
-    type = int
-    auto_increment = true
+    type = varchar(64)
   }
-  column "source" {
+  column "name" {
+    type = varchar(255)
+  }
+  column "source_type" {
     type = varchar(64)
   }
   column "status" {
-    type = varchar(32)
+    type    = varchar(32)
+    default = sql("'queued'")
+  }
+  column "worker_job_id" {
+    type    = varchar(64)
+    null    = true
+  }
+  column "target_db_url" {
+    type = text
   }
   column "created_at" {
-    type = timestamp
+    type    = timestamptz
+    default = sql("now()")
   }
+  column "updated_at" {
+    type    = timestamptz
+    default = sql("now()")
+  }
+
   primary_key {
     columns = [column.id]
+  }
+
+  index "migrations_source_type_idx" {
+    columns = [column.source_type]
+  }
+
+  index "migrations_status_idx" {
+    columns = [column.status]
   }
 }
 
 table "accounts" {
+  schema = schema.public
+
   column "id" {
     type = uuid
   }
@@ -29,7 +55,8 @@ table "accounts" {
     type = varchar(255)
   }
   column "source_type" {
-    type = varchar(64)
+    type    = varchar(64)
+    default = sql("'github_marketplace'")
   }
   column "stripe_customer_id" {
     type = varchar(255)
@@ -40,14 +67,22 @@ table "accounts" {
     null = true
   }
   column "status" {
-    type = varchar(32)
+    type    = varchar(32)
     default = sql("'active'")
   }
   column "plan_name" {
     type = varchar(255)
     null = true
   }
+  column "email" {
+    type = varchar(255)
+    null = true
+  }
   column "created_at" {
+    type    = timestamptz
+    default = sql("now()")
+  }
+  column "updated_at" {
     type    = timestamptz
     default = sql("now()")
   }
@@ -63,6 +98,8 @@ table "accounts" {
 }
 
 table "products" {
+  schema = schema.public
+
   column "id" {
     type = uuid
   }
@@ -95,6 +132,8 @@ table "products" {
 }
 
 table "orders" {
+  schema = schema.public
+
   column "id" {
     type = uuid
   }
@@ -123,6 +162,8 @@ table "orders" {
 }
 
 table "customers" {
+  schema = schema.public
+
   column "id" {
     type = uuid
   }
@@ -134,6 +175,10 @@ table "customers" {
   }
   column "source_id" {
     type = text
+  }
+  column "created_at" {
+    type    = timestamptz
+    default = sql("now()")
   }
 
   primary_key {
